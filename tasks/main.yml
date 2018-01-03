@@ -37,6 +37,15 @@
     owner: "{{ dehydrated_user }}"
     group: "{{ dehydrated_group }}"
 
+- name: Compute folders to create
+  set_fact:
+    dehydrated_folders: >-
+      {{ [ dehydrated_log_dir,
+           dehydrated_config_basedir,
+           dehydrated_config_certdir,
+           dehydrated_config_accountdir
+         ] | union([dehydrated_config_d] if dehydrated_config_d is defined else []) }}
+
 - name: Ensure dehydrated config dirs
   file:
     path: "{{ item }}"
@@ -44,11 +53,7 @@
     owner: "{{ dehydrated_user }}"
     group: "{{ dehydrated_group }}"
     mode: 0700
-  with_items:
-    - "{{ dehydrated_log_dir }}"
-    - "{{ dehydrated_config_basedir }}"
-    - "{{ dehydrated_config_certdir }}"
-    - "{{ dehydrated_config_accountdir }}"
+  with_items: "{{ dehydrated_folders }}"
 
 - name: Render dehydrated config file
   template:
