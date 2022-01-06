@@ -11,25 +11,36 @@
 # Default values of this config are in comments        #
 ########################################################
 
+# Which user should dehydrated run as? This will be implictly enforced when running as root
+{% if dehydrated_config_user is defined %}
+DEHYDRATED_USER="{{ dehydrated_config_user }}"
+{% else %}
+#DEHYDRATED_USER=
+{% endif %}
+
+# Which group should dehydrated run as? This will be implictly enforced when running as root
+{% if dehydrated_config_group is defined %}
+DEHYDRATED_GROUP="{{ dehydrated_config_group }}"
+{% else %}
+#DEHYDRATED_GROUP=
+{% endif %}
+
 # Resolve names to addresses of IP version only. (curl)
 # supported values: 4, 6
 # default: <unset>
 IP_VERSION="{{ dehydrated_config_ip_version }}"
 
-# Path to certificate authority (default: https://acme-v01.api.letsencrypt.org/directory)
+# Path to certificate authority (default: https://acme-v02.api.letsencrypt.org/directory)
 CA="{{ dehydrated_config_ca }}"
 
-# Path to certificate authority license terms redirect (default: https://acme-v01.api.letsencrypt.org/terms)
-CA_TERMS="{{ dehydrated_config_ca_terms }}"
+# Path to old certificate authority
+# Set this value to your old CA value when upgrading from ACMEv1 to ACMEv2 under a different endpoint.
+# If dehydrated detects an account-key for the old CA it will automatically reuse that key
+# instead of registering a new one.
+# default: https://acme-v01.api.letsencrypt.org/directory
+OLDCA="{{ dehydrated_config_oldca }}"
 
-# Path to license agreement (default: <unset>)
-{% if dehydrated_config_license is defined %}
-LICENSE="{{ dehydrated_config_license }}"
-{% else %}
-#LICENSE=""
-{% endif %}
-
-# Which challenge should be used? Currently http-01 and dns-01 are supported
+# Which challenge should be used? Currently http-01, dns-01 and tls-alpn-01 are supported
 CHALLENGETYPE="{{ dehydrated_config_challengetype }}"
 
 # Path to a directory containing additional config files, allowing to override
@@ -42,14 +53,26 @@ CONFIG_D="{{ dehydrated_config_d }}"
 #CONFIG_D=
 {% endif %}
 
+# Directory for per-domain configuration files.
+# If not set, per-domain configurations are sourced from each certificates output directory.
+# default: <unset>
+{% if dehydrated_config_domains_d is defined %}
+DOMAINS_D="{{ dehydrated_config_domains_d }}"
+{% else %}
+#DOMAINS_D=
+{% endif %}
+
 # Base directory for account key, generated certificates and list of domains (default: $SCRIPTDIR -- uses config directory if undefined)
 BASEDIR="{{ dehydrated_config_basedir }}"
 
 # File containing the list of domains to request certificates for (default: $BASEDIR/domains.txt)
-DOMAINS_TXT="{{ dehydrated_config_domains_txt }}"
+DOMAINS_TXT="{{ dehydrated_domains_txt }}"
 
 # Output directory for generated certificates
 CERTDIR="{{ dehydrated_config_certdir }}"
+
+# Output directory for alpn verification certificates
+ALPNCERTDIR="{{ dehydrated_config_alpncertdir }}"
 
 # Directory for account keys and registration information
 ACCOUNTDIR="{{ dehydrated_config_accountdir }}"
@@ -67,6 +90,16 @@ OPENSSL_CNF="{{ dehydrated_config_openssl_cnf }}"
 #OPENSSL_CNF=
 {% endif %}
 
+# Path to OpenSSL binary (default: "openssl")
+OPENSSL="{{ dehydrated_config_openssl }}"
+
+# Extra options passed to the curl binary (default: <unset>)
+{% if dehydrated_config_curl_opts is defined %}
+CURL_OPTS="{{ dehydrated_config_curl_opts }}"
+{% else %}
+#CURL_OPTS=
+{% endif %}
+
 # Program or function called in certain situations
 #
 # After generating the challenge-response, or after failed challenge (in this case altname is empty)
@@ -77,8 +110,8 @@ OPENSSL_CNF="{{ dehydrated_config_openssl_cnf }}"
 #
 # BASEDIR and WELLKNOWN variables are exported and can be used in an external program
 # default: <unset>
-{% if dehydrated_config_hook is defined %}
-HOOK="{{ dehydrated_config_hook }}"
+{% if dehydrated_hook is defined %}
+HOOK="{{ dehydrated_hook }}"
 {% else %}
 #HOOK=
 {% endif %}
@@ -106,3 +139,18 @@ LOCKFILE="{{ dehydrated_config_lockfile }}"
 
 # Option to add CSR-flag indicating OCSP stapling to be mandatory (default: no)
 OCSP_MUST_STAPLE="{{ dehydrated_config_ocsp_must_stapple }}"
+
+# Fetch OCSP responses (default: no)
+OCSP_FETCH="{{ dehydrated_config_ocsp_fetch }}"
+
+# OCSP refresh interval (default: 5 days)
+OCSP_DAYS={{ dehydrated_config_ocsp_days }}
+
+# Issuer chain cache directory (default: $BASEDIR/chains)
+CHAINCACHE="{{ dehydrated_config_chaincache }}"
+
+# Automatic cleanup (default: no)
+AUTO_CLEANUP="{{ dehydrated_config_auto_cleanup }}"
+
+# ACME API version (default: auto)
+API="{{ dehydrated_config_api }}"

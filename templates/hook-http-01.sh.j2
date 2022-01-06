@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# link: https://github.com/lukas2511/dehydrated/blob/master/docs/examples/hook.sh
+set -e
+set -u
+set -o pipefail
+
+RELOAD_PROXY="{{ dehydrated_hook_reload_proxy }}"
+ret=0
+
+deploy_challenge() {
+    local DOMAIN="${1}" TOKEN_FILENAME="${2}" TOKEN_VALUE="${3}"
+}
+
+clean_challenge() {
+    local DOMAIN="${1}" TOKEN_FILENAME="${2}" TOKEN_VALUE="${3}"
+}
+
+deploy_cert() {
+    local DOMAIN="${1}" KEYFILE="${2}" CERTFILE="${3}" FULLCHAINFILE="${4}" CHAINFILE="${5}" TIMESTAMP="${6}"
+    eval $RELOAD_PROXY
+}
+
+unchanged_cert() {
+    local DOMAIN="${1}" KEYFILE="${2}" CERTFILE="${3}" FULLCHAINFILE="${4}" CHAINFILE="${5}"
+}
+
+invalid_challenge() {
+    local DOMAIN="${1}" RESPONSE="${2}"
+    echo " + Invalid challenge for $DOMAIN:"
+    echo "$RESPONSE"
+    ret=1
+}
+
+request_failure() {
+    local STATUSCODE="${1}" REASON="${2}" REQTYPE="${3}"
+    echo " + Request failure for request type '${REQTYPE}': (${STATUSCODE}) ${REASON}"
+    ret=2
+}
+
+startup_hook() {
+    :
+}
+
+exit_hook() {
+    :
+}
+
+HANDLER="$1"; shift
+if [[ "${HANDLER}" =~ ^(deploy_challenge|clean_challenge|deploy_cert|unchanged_cert|invalid_challenge|request_failure|startup_hook|exit_hook)$ ]]; then
+    "$HANDLER" "$@"
+fi
+
+exit $ret

@@ -5,3 +5,4 @@ dehydrated_deps:
   - wget
   - curl
   - openssl
+  - sudo
