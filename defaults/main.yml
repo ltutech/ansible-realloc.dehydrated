@@ -1,11 +1,9 @@
 ---
 
 dehydrated_url: https://raw.githubusercontent.com/lukas2511/dehydrated/v0.6.5/dehydrated
-dehydrated_config_dir: /etc/dehydrated
+dehydrated_bin_dir: /opt/letsencrypt
+dehydrated_etc_dir: /etc/dehydrated
 dehydrated_log_dir: /var/log/dehydrated
-dehydrated_dir: /opt/letsencrypt
-dehydrated_user: letsencrypt
-dehydrated_group: letsencrypt
 
 dehydrated_domains: []
 
@@ -15,8 +13,34 @@ dehydrated_cron_day: "*/5"
 dehydrated_cron_weekday: "*"
 dehydrated_cron_month: "*"
 
+# HTTP parameters
+# The reload proxy routine for the proposed http hook
+dehydrated_hook_reload_proxy: "nginx -t && nginx -s reload"
+
+# DNS parameters
+# The DNS server to update
+#dehydrated_dns_server:
+# The default TTL fields for the DNS entry update
+dehydrated_dns_ttl: 604800
+# DNS key files to use nsupdate
+#dehydrated_dns_key: 
+#dehydrated_dns_key_private: 
+# The host path to copy DNS key files from
+#dehydrated_playbook_dns_key_dir:
+# Host and path to store DNS generated certs
+#dehydrated_cert_remote_host:
+#dehydrated_cert_remote_path:
+
+# Dehydrated config param, adapted from https://github.com/lukas2511/dehydrated/blob/master/docs/examples/config
+# These param end up in the file rendered by templates/config.j2
 # It's not a dictionary because Ansible doesn't merge them by default
 # Each options is a separate variable here.
+
+# Which user should dehydrated run as? This will be implictly enforced when running as root
+#dehydrated_config_user:
+
+# Which group should dehydrated run as? This will be implictly enforced when running as root
+#dehydrated_config_group:
 
 # Resolve names to addresses of IP version only. (curl)
 # supported values: 4, 6
@@ -34,10 +58,7 @@ dehydrated_config_ca: "https://acme-v02.api.letsencrypt.org/directory"
 # default: https://acme-v01.api.letsencrypt.org/directory
 dehydrated_config_oldca: "https://acme-v01.api.letsencrypt.org/directory"
 
-# Path to license agreement (default: <unset>)
-#dehydrated_config_license:
-
-# Which challenge should be used? Currently http-01 and dns-01 are supported
+# Which challenge should be used? Currently http-01, dns-01 and tls-alpn-01 are supported
 dehydrated_config_challengetype: "http-01"
 
 # Path to a directory containing additional config files, allowing to override
@@ -46,14 +67,23 @@ dehydrated_config_challengetype: "http-01"
 # default: <unset>
 #dehydrated_config_d:
 
+# Directory for per-domain configuration files.
+# If not set, per-domain configurations are sourced from each certificates output directory.
+# default: <unset>
+#dehydrated_config_domains_d:
+
 # Base directory for account key, generated certificates and list of domains (default: $SCRIPTDIR -- uses config directory if undefined)
-dehydrated_config_basedir: "{{ dehydrated_config_dir }}"
+dehydrated_config_basedir: "{{ dehydrated_etc_dir }}"
 
 # File containing the list of domains to request certificates for (default: $BASEDIR/domains.txt)
-dehydrated_config_domains_txt: "{{ dehydrated_config_basedir }}/domains.txt"
+#dehydrated_config_domains_txt:
 
 # Output directory for generated certificates
 dehydrated_config_certdir: "{{ dehydrated_config_basedir }}/certs"
+
+# Output directory for alpn verification certificates
+#ALPNCERTDIR="${BASEDIR}/alpn-certs"
+dehydrated_config_alpncertdir: "{{ dehydrated_config_basedir }}/alpn-certs"
 
 # Directory for account keys and registration information
 dehydrated_config_accountdir: "{{ dehydrated_config_basedir }}/accounts"
@@ -67,6 +97,12 @@ dehydrated_config_keysize: 4096
 
 # Path to openssl config file (default: <unset> - tries to figure out system default)
 #dehydrated_config_openssl_cnf:
+
+# Path to OpenSSL binary (default: "openssl")
+dehydrated_config_openssl: "openssl"
+
+# Extra options passed to the curl binary (default: <unset>)
+#dehydrated_config_curl_opts:
 
 # Program or function called in certain situations
 #
@@ -103,3 +139,18 @@ dehydrated_config_lockfile: "{{ dehydrated_config_basedir }}/lock"
 
 # Option to add CSR-flag indicating OCSP stapling to be mandatory (default: no)
 dehydrated_config_ocsp_must_stapple: "no"
+
+# Fetch OCSP responses (default: no)
+dehydrated_config_ocsp_fetch: "no"
+
+# OCSP refresh interval (default: 5 days)
+dehydrated_config_ocsp_days: 5
+
+# Issuer chain cache directory (default: $BASEDIR/chains)
+dehydrated_config_chaincache: "{{ dehydrated_config_basedir }}/chains"
+
+# Automatic cleanup (default: no)
+dehydrated_config_auto_cleanup: "no"
+
+# ACME API version (default: auto)
+dehydrated_config_api: "auto"

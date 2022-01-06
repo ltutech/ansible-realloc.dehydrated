@@ -3,24 +3,34 @@
 # - conf.d support
 # - initial run
 
-# Variable setup.
+# OS-Specific variable setup
 - name: Include OS-Specific variables
   include_vars: "{{ ansible_os_family }}.yml"
 
 # Install dependencies
 - include: "setup-{{ ansible_os_family }}.yml"
 
-# Install dehydrated script
-- name: LE home
-  file:
-    path: "{{ dehydrated_dir }}"
-    state: directory
+# Init variables
+- name: Pre-set playbook variables
+  set_fact:
+    dehydrated_domains_txt_default: "{{ dehydrated_config_basedir }}/domains-{{ dehydrated_config_challengetype }}.txt"
+    dehydrated_hooks_dir: "{{ dehydrated_config_basedir }}/hooks"
+    dehydrated_hook_default: "{{ dehydrated_config_basedir }}/hooks/hook-{{ dehydrated_config_challengetype }}.sh"
 
-- name: Get dehydrated release archive
-  get_url:
-    url: " {{ dehydrated_url }}"
-    dest: "{{ dehydrated_dir }}/dehydrated"
-    mode: 0775
+- name: Set playbook variables
+  set_fact:
+    dehydrated_user: "{{ dehydrated_config_user | default('letsencrypt') }}"
+    dehydrated_group: "{{ dehydrated_config_group | default('letsencrypt') }}"
+    dehydrated_domains_txt: "{{ dehydrated_config_domains_txt | default(dehydrated_domains_txt_default) }}"
+    dehydrated_remote_cert_dir: "{{ dehydrated_config_basedir }}/certs"
+    dehydrated_dns_key_dir: "{{ dehydrated_config_basedir }}/keys"
+    dehydrated_hook: "{{ dehydrated_config_hook | default(dehydrated_hook_default) }}"
+    dehydrated_main_domains: |
+      {% if dehydrated_domains is mapping %}
+      {{ dehydrated_domains.keys() }}
+      {% else %}
+      {{ dehydrated_domains }}
+      {% endif %}
 
 - name: Ensure there is LE user
   user:
@@ -29,6 +39,70 @@
     createhome: yes
     shell: /bin/bash
 
+# Init directories
+- name: Ensure dehydrated bin, etc and log dirs exist
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ dehydrated_user }}"
+    group: "{{ dehydrated_group }}"
+    mode: 0755
+  with_items:
+    - "{{ dehydrated_bin_dir }}"
+    - "{{ dehydrated_config_basedir }}"
+    - "{{ dehydrated_log_dir }}"
+
+- name: Ensure dehydrated extra config dirs exist
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ dehydrated_user }}"
+    group: "{{ dehydrated_group }}"
+    mode: 0755
+  with_items:
+    - "{{ dehydrated_config_d }}"
+  when: dehydrated_config_d is defined
+  
+- name: Ensure dehydrated restricted dirs exist
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ dehydrated_user }}"
+    group: "{{ dehydrated_group }}"
+    mode: 0700
+  with_items:
+    - "{{ dehydrated_config_accountdir }}"
+    - "{{ dehydrated_hooks_dir }}"
+
+- name: Ensure dehydrated HTTP config dirs exit
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ dehydrated_user }}"
+    group: "{{ dehydrated_group }}"
+    mode: 0700
+  with_items:
+    - "{{ dehydrated_config_certdir }}"
+  when: dehydrated_config_challengetype == "http-01"
+
+- name: Ensure dehydrated DNS config dirs exist
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ dehydrated_user }}"
+    group: "{{ dehydrated_group }}"
+    mode: 0700
+  with_items:
+    - "{{ dehydrated_dns_key_dir }}"
+  when: dehydrated_config_challengetype == "dns-01"
+
+# Install dehydrated script
+- name: Get dehydrated release archive
+  get_url:
+    url: " {{ dehydrated_url }}"
+    dest: "{{ dehydrated_bin_dir }}/dehydrated"
+    mode: 0775
+
 - name: Ensure there is acme-challenge directory
   file:
     path: "{{ dehydrated_config_wellknown }}"
@@ -36,49 +110,50 @@
     mode: 0755
     owner: "{{ dehydrated_user }}"
     group: "{{ dehydrated_group }}"
-
-- name: Compute folders to create
-  set_fact:
-    dehydrated_folders: >-
-      {{ [ dehydrated_log_dir,
-           dehydrated_config_basedir,
-           dehydrated_config_certdir,
-           dehydrated_config_accountdir
-         ] | union([dehydrated_config_d] if dehydrated_config_d is defined else []) }}
-
-- name: Ensure dehydrated config dirs
-  file:
-    path: "{{ item }}"
-    state: directory
-    owner: "{{ dehydrated_user }}"
-    group: "{{ dehydrated_group }}"
-    mode: 0700
-  with_items: "{{ dehydrated_folders }}"
+  when: dehydrated_config_challengetype == "http-01"
 
 - name: Render dehydrated config file
   template:
     src: config.j2
-    dest: "{{ dehydrated_config_dir}}/config"
+    dest: "{{ dehydrated_config_basedir}}/config-{{ dehydrated_config_challengetype }}"
     owner: root
     group: "{{ dehydrated_group }}"
     mode: 0640
 
-- name: Set dehydrated_main_domains list
-  set_fact:
-    dehydrated_main_domains: |
-      {% if dehydrated_domains is mapping %}
-      {{ dehydrated_domains.keys() }}
-      {% else %}
-      {{ dehydrated_domains }}
-      {% endif %}
+- name: Render dns hook file
+  template:
+    src: hook-dns-01.sh.j2
+    dest: "{{ dehydrated_hook }}"
+    owner: root
+    group: "{{ dehydrated_group }}"
+    mode: 0750
+  when: dehydrated_config_challengetype == "dns-01"
+
+- name: Render http hook file
+  template:
+    src: hook-http-01.sh.j2
+    dest: "{{ dehydrated_hook }}"
+    owner: root
+    group: "{{ dehydrated_group }}"
+    mode: 0750
+  when: dehydrated_config_challengetype == "http-01"
 
 - name: Render dehydrated domains.txt
   template:
     src: domains.txt.j2
-    dest: "{{ dehydrated_config_dir}}/domains.txt"
+    dest: "{{ dehydrated_domains_txt }}"
     owner: root
     group: "{{ dehydrated_group }}"
     mode: 0640
+
+- name: Prepare DNS update key files
+  copy:
+    src: "{{ item }}"
+    dest: "{{ dehydrated_dns_key_dir }}"
+  with_items:
+    - "{{ dehydrated_playbook_dns_key_dir }}/{{ dehydrated_dns_key }}"
+    - "{{ dehydrated_playbook_dns_key_dir }}/{{ dehydrated_dns_key_private }}"
+  when: dehydrated_config_challengetype == "dns-01"
 
 - name: Do we have any certs for our domains?
   stat:
@@ -86,6 +161,7 @@
   register: cert_stats
   with_items:
     - "{{ dehydrated_main_domains }}"
+  when: dehydrated_config_challengetype == "http-01"
 
 - name: Check dirs (first time) for fake certs
   file:
@@ -94,7 +170,9 @@
     owner: "{{ dehydrated_user }}"
     group: "{{ dehydrated_group }}"
     mode: 0700
-  when: item.stat.exists == False
+  when:
+    - dehydrated_config_challengetype == "http-01"
+    - item.stat.exists == False
   with_items:
     - "{{ cert_stats.results }}"
 
@@ -106,17 +184,19 @@
     -keyout {{ dehydrated_config_certdir }}/{{ item.item }}/privkey.pem \
     -out {{ dehydrated_config_certdir }}/{{ item.item }}/fullchain.pem \
     -subj "/C=US/ST=Oregon/L=Portland/O=ACME/OU=Org/CN=fake.host"
-  when: item.stat.exists == False
+  when:
+    - dehydrated_config_challengetype == "http-01"
+    - item.stat.exists == False
   with_items:
     - "{{ cert_stats.results }}"
 
 - name: Ensure LE Agent check is in cron
   cron:
-    name: dehydrated
+    name: "dehydrated-{{ dehydrated_config_challengetype }}"
     user: "{{ dehydrated_user }}"
     minute: "{{ dehydrated_cron_minute }}"
     hour: "{{ dehydrated_cron_hour }}"
     day: "{{ dehydrated_cron_day }}"
     weekday: "{{ dehydrated_cron_weekday }}"
     month: "{{ dehydrated_cron_month }}"
-    job: "(date; {{ dehydrated_dir }}/dehydrated -c --accept-terms -fc -f {{ dehydrated_config_dir}}/config) >> {{ dehydrated_log_dir }}/cron.log 2>&1"
+    job: "(date; {{ dehydrated_bin_dir }}/dehydrated --cron --accept-terms --full-chain --config {{ dehydrated_config_basedir}}/config-{{ dehydrated_config_challengetype }}) >> {{ dehydrated_log_dir }}/cron.log 2>&1"

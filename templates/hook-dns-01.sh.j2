@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# link: https://github.com/lukas2511/dehydrated/blob/master/docs/examples/hook.sh
+# link: https://github.com/lukas2511/dehydrated/wiki/example-dns-01-nsupdate-script
+set -e
+set -u
+set -o pipefail
+
+NSUPDATE="nsupdate -k {{ dehydrated_dns_key_dir }}/{{ dehydrated_dns_key }}"
+DNSSERVER="{{ dehydrated_dns_server }}"
+TTL={{ dehydrated_dns_ttl }}
+today=$(date +%Y%m%d)
+ret=0
+
+deploy_challenge() {
+    local DOMAIN="${1}" TOKEN_FILENAME="${2}" TOKEN_VALUE="${3}"
+    printf "server %s\nupdate add _acme-challenge.%s. %d in TXT \"%s\"\nsend\n" "${DNSSERVER}" "${DOMAIN}" "${TTL}" "${TOKEN_VALUE}" | $NSUPDATE
+}
+
+clean_challenge() {
+    local DOMAIN="${1}" TOKEN_FILENAME="${2}" TOKEN_VALUE="${3}"
+    printf "server %s\nupdate delete _acme-challenge.%s. %d in TXT \"%s\"\nsend\n" "${DNSSERVER}" "${DOMAIN}" "${TTL}" "${TOKEN_VALUE}" | $NSUPDATE
+}
+
+deploy_cert() {
+    local DOMAIN="${1}" KEYFILE="${2}" CERTFILE="${3}" FULLCHAINFILE="${4}" CHAINFILE="${5}" TIMESTAMP="${6}"
+    local DOMAIN_WILDCARD_PROOF="${DOMAIN/\*/\\*}"
+    scp -r ${FULLCHAINFILE} {{ dehydrated_cert_remote_host }}:{{ dehydrated_cert_remote_path }}/${DOMAIN_WILDCARD_PROOF}/fullchain-${today}.pem
+    chmod 644 ${KEYFILE}
+    scp -r ${KEYFILE} {{ dehydrated_cert_remote_host }}:{{ dehydrated_cert_remote_path }}/${DOMAIN_WILDCARD_PROOF}/privkey-${today}.pem
+    ssh {{ dehydrated_cert_remote_host }} "cd "{{ dehydrated_cert_remote_path }}/${DOMAIN_WILDCARD_PROOF}/"; ln -sf fullchain-${today}.pem fullchain.pem"
+    ssh {{ dehydrated_cert_remote_host }} "cd "{{ dehydrated_cert_remote_path }}/${DOMAIN_WILDCARD_PROOF}/"; ln -sf privkey-${today}.pem privkey.pem"
+}
+
+unchanged_cert() {
+    local DOMAIN="${1}" KEYFILE="${2}" CERTFILE="${3}" FULLCHAINFILE="${4}" CHAINFILE="${5}"
+}
+
+invalid_challenge() {
+    local DOMAIN="${1}" RESPONSE="${2}"
+    echo " + Invalid challenge for $DOMAIN:"
+    echo "$RESPONSE"
+    ret=1
+}
+
+request_failure() {
+    local STATUSCODE="${1}" REASON="${2}" REQTYPE="${3}"
+    echo " + Request failure for request type '${REQTYPE}': (${STATUSCODE}) ${REASON}"
+    ret=2
+}
+
+startup_hook() {
+    :
+}
+
+exit_hook() {
+    :
+}
+
+HANDLER="$1"; shift
+if [[ "${HANDLER}" =~ ^(deploy_challenge|clean_challenge|deploy_cert|unchanged_cert|invalid_challenge|request_failure|startup_hook|exit_hook)$ ]]; then
+    "$HANDLER" "$@"
+fi
+
+exit $ret
