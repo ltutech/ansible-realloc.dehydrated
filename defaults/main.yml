@@ -1,6 +1,6 @@
 ---
 
-dehydrated_url: https://raw.githubusercontent.com/lukas2511/dehydrated/v0.4.0/dehydrated
+dehydrated_url: https://raw.githubusercontent.com/lukas2511/dehydrated/v0.6.5/dehydrated
 dehydrated_config_dir: /etc/dehydrated
 dehydrated_log_dir: /var/log/dehydrated
 dehydrated_dir: /opt/letsencrypt
@@ -24,11 +24,15 @@ dehydrated_cron_month: "*"
 #IP_VERSION=
 dehydrated_config_ip_version: 4
 
-# Path to certificate authority (default: https://acme-v01.api.letsencrypt.org/directory)
-dehydrated_config_ca: "https://acme-v01.api.letsencrypt.org/directory"
+# Path to certificate authority (default: https://acme-v02.api.letsencrypt.org/directory)
+dehydrated_config_ca: "https://acme-v02.api.letsencrypt.org/directory"
 
-# Path to certificate authority license terms redirect (default: https://acme-v01.api.letsencrypt.org/terms)
-dehydrated_config_ca_terms: "https://acme-v01.api.letsencrypt.org/terms"
+# Path to old certificate authority
+# Set this value to your old CA value when upgrading from ACMEv1 to ACMEv2 under a different endpoint.
+# If dehydrated detects an account-key for the old CA it will automatically reuse that key
+# instead of registering a new one.
+# default: https://acme-v01.api.letsencrypt.org/directory
+dehydrated_config_oldca: "https://acme-v01.api.letsencrypt.org/directory"
 
 # Path to license agreement (default: <unset>)
 #dehydrated_config_license:
